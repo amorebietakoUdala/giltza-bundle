@@ -1,0 +1,3 @@
+GiltzaBundle:
+    resource: "@GiltzaBundle/Controller/"
+    type: attribute

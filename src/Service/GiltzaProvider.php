@@ -1,0 +1,253 @@
+<?php
+/**
+ * This file is part of the league/oauth2-client library
+ *
+ * For the full copyright and license information, please view the LICENSE
+ * file that was distributed with this source code.
+ *
+ * @copyright Copyright (c) Alex Bilbie <hello@alexbilbie.com>
+ * @license http://opensource.org/licenses/MIT MIT
+ * @link http://thephpleague.com/oauth2-client/ Documentation
+ * @link https://packagist.org/packages/league/oauth2-client Packagist
+ * @link https://github.com/thephpleague/oauth2-client GitHub
+ */
+
+namespace AMREU\GiltzaBundle\Service;
+
+use InvalidArgumentException;
+use League\OAuth2\Client\Provider\AbstractProvider;
+use League\OAuth2\Client\Provider\Exception\IdentityProviderException;
+use League\OAuth2\Client\Provider\GenericResourceOwner;
+use League\OAuth2\Client\Provider\ResourceOwnerInterface;
+use League\OAuth2\Client\Token\AccessToken;
+use League\OAuth2\Client\Tool\BearerAuthorizationTrait;
+use Psr\Http\Message\ResponseInterface;
+use Symfony\Component\Routing\Generator\UrlGeneratorInterface;
+
+/**
+ * Represents a generic service provider that may be used to interact with any
+ * OAuth 2.0 service provider, using Bearer token authentication.
+ */
+class GiltzaProvider extends AbstractProvider
+{
+    use BearerAuthorizationTrait;
+
+    /**
+     * @var string
+     */
+    private $urlAuthorize;
+
+    /**
+     * @var string
+     */
+    private $urlAccessToken;
+
+    /**
+     * @var string
+     */
+    private $urlResourceOwnerDetails;
+
+    /**
+     * @var string
+     */
+    private $accessTokenMethod;
+
+    /**
+     * @var string
+     */
+    private $accessTokenResourceOwnerId;
+
+    /**
+     * @var array|null
+     */
+    private $scopes = null;
+
+    /**
+     * @var string
+     */
+    private $scopeSeparator;
+
+    /**
+     * @var string
+     */
+    private $responseError = 'error';
+
+    /**
+     * @var string
+     */
+    private $responseCode;
+
+    /**
+     * @var string
+     */
+    private $responseResourceOwnerId = 'id';
+
+    /**
+     * @param array $options
+     * @param array $collaborators
+     */
+    public function __construct(private UrlGeneratorInterface $urlGenerator,array $options = [], array $collaborators = [])
+    {
+        $this->assertRequiredOptions($options);
+
+        $possible   = $this->getConfigurableOptions();
+        $configured = array_intersect_key($options, array_flip($possible));
+
+        foreach ($configured as $key => $value) {
+            $this->$key = $value;
+        }
+
+        if ( $this->redirectUri !== null && mb_stripos($this->redirectUri, 'http') === false) {
+            $this->redirectUri = $this->urlGenerator->generate($this->redirectUri, [], UrlGeneratorInterface::ABSOLUTE_URL);
+        }
+
+        // Remove all options that are only used locally
+        $options = array_diff_key($options, $configured);
+        parent::__construct($options, $collaborators);
+    }
+
+    /**
+     * Returns all options that can be configured.
+     *
+     * @return array
+     */
+    protected function getConfigurableOptions()
+    {
+        return array_merge($this->getRequiredOptions(), [
+            'scope',
+            'acr_values',
+            'state',
+            'prompt',
+            'ui_locales',
+            'login_hint',
+        ]);
+    }
+
+    /**
+     * Returns all options that are required.
+     *
+     * @return array
+     */
+    protected function getRequiredOptions()
+    {
+        return [
+            'urlAuthorize',
+            'urlAccessToken',
+            'urlResourceOwnerDetails',
+            'clientId',
+            'clientSecret',
+            'redirectUri',
+        ];
+    }
+
+    /**
+     * Verifies that all required options have been passed.
+     *
+     * @return void
+     * @throws InvalidArgumentException
+     */
+    private function assertRequiredOptions(array $options)
+    {
+        $missing = array_diff_key(array_flip($this->getRequiredOptions()), $options);
+
+        if (!empty($missing)) {
+            throw new InvalidArgumentException(
+                'Required options not defined: ' . implode(', ', array_keys($missing))
+            );
+        }
+    }
+
+    /**
+     * @inheritdoc
+     */
+    public function getBaseAuthorizationUrl(): string
+    {
+        return $this->urlAuthorize;
+    }
+
+    /**
+     * @inheritdoc
+     */
+    public function getBaseAccessTokenUrl(array $params): string
+    {
+        return $this->urlAccessToken;
+    }
+
+     public function getHeaders($token = null): array
+    {
+        // We have to use HTTP Basic Auth when requesting an access token
+        $headers = [];
+        if ( ! $token) {
+            $auth = base64_encode(sprintf('%s:%s',$this->clientId, $this->clientSecret));
+            $headers["Authorization"] = "Basic $auth";
+        }
+
+        return array_merge(parent::getHeaders($token), $headers);
+    }   
+
+    /**
+     * @inheritdoc
+     */
+    public function getResourceOwnerDetailsUrl(AccessToken $token): string 
+    {
+        return $this->urlResourceOwnerDetails;
+    }
+
+    /**
+     * @inheritdoc
+     */
+    public function getDefaultScopes(): array
+    {
+        return $this->scopes;
+    }
+
+    /**
+     * @inheritdoc
+     */
+    protected function getAccessTokenMethod(): string 
+    {
+        return $this->accessTokenMethod ?: parent::getAccessTokenMethod();
+    }
+
+    /**
+     * @inheritdoc
+     */
+    protected function getAccessTokenResourceOwnerId(): ?string
+    {
+        return $this->accessTokenResourceOwnerId ?: parent::getAccessTokenResourceOwnerId();
+    }
+
+    /**
+     * @inheritdoc
+     */
+    protected function getScopeSeparator(): string 
+    {
+        return $this->scopeSeparator ?: parent::getScopeSeparator();
+    }
+
+    /**
+     * @inheritdoc
+     */
+    protected function checkResponse(ResponseInterface $response, $data): void
+    {
+        if (!empty($data[$this->responseError])) {
+            $error = $data[$this->responseError];
+            if (!is_string($error)) {
+                $error = var_export($error, true);
+            }
+            $code  = $this->responseCode && !empty($data[$this->responseCode])? $data[$this->responseCode] : 0;
+            if (!is_int($code)) {
+                $code = intval($code);
+            }
+            throw new IdentityProviderException($error, $code, $data);
+        }
+    }
+
+    /**
+     * @inheritdoc
+     */
+    protected function createResourceOwner(array $response, AccessToken $token): ResourceOwnerInterface
+    {
+        return new GenericResourceOwner($response, $this->responseResourceOwnerId);
+    }
+}

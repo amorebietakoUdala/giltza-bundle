@@ -1,0 +1,27 @@
+{
+  "name": "amorebietakoudala/giltza-bundle",
+  "description": "Integración de Giltza para Symfony",
+  "type": "symfony-bundle",
+  "license": "proprietary",
+  "autoload": {
+      "psr-4": {
+          "AMREU\\GiltzaBundle\\": "src/"
+      }
+  },
+  "extra": {
+    "symfony": {
+      "bundle": "AMREU\\GiltzaBundle\\GiltzaBundle"
+    }
+  },
+  "require": {
+    "php": ">=8.2",
+    "symfony/framework-bundle": "^6.4|^7.0",
+    "symfony/http-foundation": "^6.4|^7.0",
+    "symfony/http-kernel": "^6.4|^7.0",
+    "symfony/routing": "^6.4|^7.0",
+    "league/oauth2-client": "^2.7"
+  },
+  "minimum-stability": "dev",
+  "prefer-stable": true,
+  "version": "0.1.0"
+}
