@@ -19,9 +19,11 @@ class GiltzaController extends AbstractController
     {
     }
 
-    #[Route(path: '/giltza/{_locale}', name: 'amreu_giltza_login', requirements: ['_locale' => 'es|eu|en'])]
-    public function giltza(Request $request, string $_locale = 'es'): Response
+    #[Route(path: '/giltza', name: 'amreu_giltza_login')]
+    public function giltza(Request $request): Response
     {
+        $locale = $request->getSession()->get("_locale",$request->getDefaultLocale());
+        $this->options['ui_locales'] = $locale;
         // If we don't have an authorization code then get one
         if (!isset($_GET['code'])) {
             $authorizationUrl = $this->provider->getAuthorizationUrl($this->options);
