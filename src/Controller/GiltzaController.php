@@ -72,7 +72,7 @@ class GiltzaController extends AbstractController
         return $this->json($giltzaUser);
     }
 
-    #[Route(path: '/logout', name: 'app_logout')]
+    #[Route(path: '/logout', name: 'amreu_giltza_logout')]
     public function logout(Request $request): Response
     {
         $request->getSession()->invalidate();
