@@ -21,7 +21,7 @@
     "symfony/routing": "^6.4|^7.0",
     "league/oauth2-client": "^2.7"
   },
-  "minimum-stability": "dev",
+  "minimum-stability": "stable",
   "prefer-stable": true,
   "version": "0.1.0"
 }
