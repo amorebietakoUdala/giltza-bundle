@@ -22,6 +22,5 @@
     "league/oauth2-client": "^2.7"
   },
   "minimum-stability": "stable",
-  "prefer-stable": true,
-  "version": "0.2.1"
+  "prefer-stable": true
 }
